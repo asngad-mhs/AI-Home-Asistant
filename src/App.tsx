@@ -39,37 +39,75 @@ export default function App() {
   ]);
   const [isTyping, setIsTyping] = useState(false);
   const [isSystemOnline, setIsSystemOnline] = useState(false);
+  const [currentView, setCurrentView] = useState<'dashboard' | 'settings'>('dashboard');
+  const [userApiKey, setUserApiKey] = useState('');
 
   // Gemini Client
   const aiRef = useRef<GoogleGenAI | null>(null);
 
+  // Initialize AI Client
   useEffect(() => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    console.log("Checking API Key...", apiKey ? "Present" : "Missing");
-    
-    if (apiKey) {
+    const initAI = (key: string) => {
       try {
-        aiRef.current = new GoogleGenAI({ apiKey });
+        console.log("Initializing AI with key:", key ? "Present" : "Missing");
+        aiRef.current = new GoogleGenAI({ apiKey: key });
         setIsSystemOnline(true);
+        // Only add success message if it was previously offline/missing
+        if (!isSystemOnline) {
+          setMessages(prev => [...prev, {
+            id: 'system-online',
+            role: 'assistant',
+            content: "Sistem Online. Koneksi ke Gemini AI berhasil dipulihkan.",
+            timestamp: Date.now()
+          }]);
+        }
       } catch (e) {
         console.error("Failed to initialize Gemini client:", e);
-        setMessages(prev => [...prev, {
-          id: 'init-error',
-          role: 'assistant',
-          content: "Sistem Error: Gagal menginisialisasi klien AI. Cek konsol untuk detail.",
-          timestamp: Date.now()
-        }]);
+        setIsSystemOnline(false);
       }
+    };
+
+    // 1. Check Environment Variable
+    const envKey = process.env.GEMINI_API_KEY;
+    
+    // 2. Check Local Storage
+    const storedKey = localStorage.getItem('gemini_api_key');
+
+    if (envKey) {
+      initAI(envKey);
+    } else if (storedKey) {
+      setUserApiKey(storedKey);
+      initAI(storedKey);
     } else {
       setIsSystemOnline(false);
       setMessages(prev => [...prev, {
         id: 'no-key',
         role: 'assistant',
-        content: "PERINGATAN: Kunci API Gemini tidak ditemukan. Pastikan Anda telah mengonfigurasi Secrets dengan benar di AI Studio.",
+        content: "PERINGATAN: Kunci API tidak ditemukan. Silakan masukkan Kunci API Gemini Anda di menu Pengaturan (Settings) untuk mengaktifkan asisten.",
         timestamp: Date.now()
       }]);
     }
   }, []);
+
+  const handleSaveKey = (key: string) => {
+    setUserApiKey(key);
+    localStorage.setItem('gemini_api_key', key);
+    if (key) {
+      try {
+        aiRef.current = new GoogleGenAI({ apiKey: key });
+        setIsSystemOnline(true);
+        setMessages(prev => [...prev, {
+          id: 'key-updated',
+          role: 'assistant',
+          content: "Kunci API diperbarui. Sistem Online.",
+          timestamp: Date.now()
+        }]);
+        setCurrentView('dashboard');
+      } catch (e) {
+        alert("Kunci API tidak valid");
+      }
+    }
+  };
 
   // --- Device Actions ---
   const toggleDevice = (id: string) => {
@@ -258,10 +296,20 @@ export default function App() {
           </div>
           
           <nav className="flex-1 p-4 space-y-2">
-            <NavItem icon={<Home />} label="Dasbor" active />
+            <NavItem 
+              icon={<Home />} 
+              label="Dasbor" 
+              active={currentView === 'dashboard'} 
+              onClick={() => setCurrentView('dashboard')}
+            />
             <NavItem icon={<Activity />} label="Analitik" />
             <NavItem icon={<Zap />} label="Energi" />
-            <NavItem icon={<Settings />} label="Sistem" />
+            <NavItem 
+              icon={<Settings />} 
+              label="Sistem" 
+              active={currentView === 'settings'}
+              onClick={() => setCurrentView('settings')}
+            />
           </nav>
 
           <div className="p-4 border-t border-cyber-border">
@@ -282,7 +330,7 @@ export default function App() {
           {/* Header */}
           <header className="h-16 border-b border-cyber-border bg-cyber-card/50 backdrop-blur flex items-center justify-between px-6">
             <h1 className="text-xl font-bold tracking-wide text-white flex items-center gap-2">
-              <span className="text-cyber-primary">///</span> KONTROL UTAMA
+              <span className="text-cyber-primary">///</span> {currentView === 'dashboard' ? 'KONTROL UTAMA' : 'PENGATURAN SISTEM'}
             </h1>
             <div className="flex items-center gap-4">
               <span className="text-xs font-mono text-gray-500">{new Date().toLocaleDateString('id-ID')}</span>
@@ -295,34 +343,97 @@ export default function App() {
           {/* Scrollable Area */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
             
-            {/* Top Row: Energy & Stats */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
-                <EnergyMonitor stats={stats} />
-              </div>
-              <div className="hidden lg:block">
-                {/* Placeholder for mini weather or quick stats */}
-                <div className="h-full glass-panel rounded-xl p-6 flex flex-col justify-between">
-                  <h3 className="text-sm font-mono font-bold uppercase text-cyber-secondary neon-text">Lingkungan</h3>
-                  <div className="text-5xl font-bold text-white">24°C</div>
-                  <div className="text-sm text-gray-400">Kelembaban: 45%</div>
-                  <div className="text-sm text-gray-400">Kualitas Udara: Sangat Baik</div>
+            {currentView === 'dashboard' ? (
+              <>
+                {/* Top Row: Energy & Stats */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2">
+                    <EnergyMonitor stats={stats} />
+                  </div>
+                  <div className="hidden lg:block">
+                    {/* Placeholder for mini weather or quick stats */}
+                    <div className="h-full glass-panel rounded-xl p-6 flex flex-col justify-between">
+                      <h3 className="text-sm font-mono font-bold uppercase text-cyber-secondary neon-text">Lingkungan</h3>
+                      <div className="text-5xl font-bold text-white">24°C</div>
+                      <div className="text-sm text-gray-400">Kelembaban: 45%</div>
+                      <div className="text-sm text-gray-400">Kualitas Udara: Sangat Baik</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Device Controls */}
+                <div>
+                  <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                    <span className="w-1 h-6 bg-cyber-primary rounded-full" />
+                    MATRIKS PERANGKAT
+                  </h2>
+                  <DeviceControl 
+                    devices={devices} 
+                    onToggle={toggleDevice} 
+                    onValueChange={setDeviceValue} 
+                  />
+                </div>
+              </>
+            ) : (
+              <div className="max-w-2xl mx-auto">
+                <div className="glass-panel rounded-xl p-8 border border-cyber-border">
+                  <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                    <Settings className="w-6 h-6 text-cyber-primary" />
+                    Konfigurasi Sistem
+                  </h2>
+                  
+                  <div className="space-y-6">
+                    <div>
+                      <label className="block text-sm font-mono text-gray-400 mb-2 uppercase tracking-wider">Status Koneksi AI</label>
+                      <div className={cn(
+                        "p-4 rounded-lg border flex items-center gap-3",
+                        isSystemOnline 
+                          ? "bg-cyber-success/10 border-cyber-success/30 text-cyber-success" 
+                          : "bg-cyber-danger/10 border-cyber-danger/30 text-cyber-danger"
+                      )}>
+                        <div className={cn("w-3 h-3 rounded-full", isSystemOnline ? "bg-cyber-success" : "bg-cyber-danger")} />
+                        <span className="font-mono font-bold">{isSystemOnline ? "TERHUBUNG KE GEMINI AI" : "TERPUTUS / TIDAK ADA KUNCI"}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-mono text-gray-400 mb-2 uppercase tracking-wider">Kunci API Gemini (Manual)</label>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Jika Anda men-deploy aplikasi ini di cloud pribadi, masukkan kunci API Anda di sini. 
+                        Kunci akan disimpan di browser Anda.
+                      </p>
+                      <div className="flex gap-2">
+                        <input 
+                          type="password" 
+                          value={userApiKey}
+                          onChange={(e) => setUserApiKey(e.target.value)}
+                          placeholder="Masukkan kunci API Gemini (AIza...)"
+                          className="flex-1 bg-black/50 border border-cyber-border rounded-lg px-4 py-3 text-white focus:outline-none focus:border-cyber-primary font-mono"
+                        />
+                        <button 
+                          onClick={() => handleSaveKey(userApiKey)}
+                          className="bg-cyber-primary text-black font-bold px-6 py-3 rounded-lg hover:bg-cyber-primary/90 transition-colors"
+                        >
+                          SIMPAN
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="pt-6 border-t border-cyber-border">
+                      <h3 className="text-lg font-bold text-white mb-4">Informasi Sistem</h3>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div className="text-gray-500">Versi</div>
+                        <div className="text-right text-mono text-white">v1.0.2-cyber</div>
+                        <div className="text-gray-500">Build</div>
+                        <div className="text-right text-mono text-white">Production</div>
+                        <div className="text-gray-500">Engine</div>
+                        <div className="text-right text-mono text-white">Gemini 2.5 Flash</div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            {/* Device Controls */}
-            <div>
-              <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                <span className="w-1 h-6 bg-cyber-primary rounded-full" />
-                MATRIKS PERANGKAT
-              </h2>
-              <DeviceControl 
-                devices={devices} 
-                onToggle={toggleDevice} 
-                onValueChange={setDeviceValue} 
-              />
-            </div>
+            )}
           </div>
         </main>
 
@@ -339,9 +450,11 @@ export default function App() {
   );
 }
 
-function NavItem({ icon, label, active }: { icon: React.ReactNode, label: string, active?: boolean }) {
+function NavItem({ icon, label, active, onClick }: { icon: React.ReactNode, label: string, active?: boolean, onClick?: () => void }) {
   return (
-    <button className={cn(
+    <button 
+      onClick={onClick}
+      className={cn(
       "w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 group",
       active 
         ? "bg-cyber-primary/10 text-cyber-primary border border-cyber-primary/20" 
