@@ -1,0 +1,5 @@
+{
+  "name": "AI Home Assistant",
+  "description": "A sophisticated mini AI home assistant dashboard with energy monitoring and device control.",
+  "requestFramePermissions": []
+}

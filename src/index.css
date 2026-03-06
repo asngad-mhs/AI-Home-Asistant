@@ -1,0 +1,57 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-cyber-bg: #050505;
+  --color-cyber-card: #0F1014;
+  --color-cyber-border: #1F2128;
+  --color-cyber-primary: #00F0FF;
+  --color-cyber-secondary: #7000FF;
+  --color-cyber-success: #00FF9D;
+  --color-cyber-warning: #FFD600;
+  --color-cyber-danger: #FF003C;
+}
+
+body {
+  background-color: var(--color-cyber-bg);
+  color: #E0E0E0;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-cyber-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-cyber-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-cyber-primary);
+}
+
+/* Utilities */
+.glass-panel {
+  background: rgba(15, 16, 20, 0.7);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--color-cyber-border);
+}
+
+.neon-text {
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
+}
+
+.neon-border {
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+}

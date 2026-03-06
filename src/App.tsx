@@ -1,0 +1,319 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React, { useState, useEffect, useRef } from 'react';
+import { GoogleGenAI, FunctionDeclaration, Type } from "@google/genai";
+import { EnergyMonitor } from '@/components/EnergyMonitor';
+import { DeviceControl } from '@/components/DeviceControl';
+import { AIChat } from '@/components/AIChat';
+import { Device, EnergyStats, ChatMessage } from '@/types';
+import { Activity, Home, Settings, Zap, User } from 'lucide-react';
+import { motion } from 'motion/react';
+import { cn } from '@/lib/utils';
+
+// Initial Mock Data
+const INITIAL_DEVICES: Device[] = [
+  { id: 'light-1', name: 'Living Room Light', type: 'light', room: 'Living Room', isOn: true, value: 80 },
+  { id: 'ac-1', name: 'Master AC', type: 'ac', room: 'Bedroom', isOn: true, value: 24 },
+  { id: 'fan-1', name: 'Ceiling Fan', type: 'fan', room: 'Living Room', isOn: false, value: 0 },
+  { id: 'lock-1', name: 'Front Door', type: 'lock', room: 'Entrance', isOn: true }, // isOn = Locked
+  { id: 'light-2', name: 'Kitchen Light', type: 'light', room: 'Kitchen', isOn: false, value: 0 },
+  { id: 'outlet-1', name: 'Coffee Maker', type: 'outlet', room: 'Kitchen', isOn: false },
+];
+
+const INITIAL_STATS: EnergyStats = {
+  currentUsage: 4.2,
+  dailyTotal: 12.5,
+  solarGeneration: 3.8,
+  batteryLevel: 85,
+  gridStatus: 'connected',
+};
+
+export default function App() {
+  const [devices, setDevices] = useState<Device[]>(INITIAL_DEVICES);
+  const [stats, setStats] = useState<EnergyStats>(INITIAL_STATS);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { id: '1', role: 'assistant', content: 'System initialized. AI Home Assistant ready. How can I help you manage your home today?', timestamp: Date.now() }
+  ]);
+  const [isTyping, setIsTyping] = useState(false);
+
+  // Gemini Client
+  const aiRef = useRef<GoogleGenAI | null>(null);
+
+  useEffect(() => {
+    if (process.env.GEMINI_API_KEY) {
+      aiRef.current = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    }
+  }, []);
+
+  // --- Device Actions ---
+  const toggleDevice = (id: string) => {
+    setDevices(prev => prev.map(d => {
+      if (d.id === id) {
+        return { ...d, isOn: !d.isOn };
+      }
+      return d;
+    }));
+  };
+
+  const setDeviceValue = (id: string, value: number) => {
+    setDevices(prev => prev.map(d => {
+      if (d.id === id) {
+        return { ...d, value };
+      }
+      return d;
+    }));
+  };
+
+  // --- AI Tools Definition ---
+  const tools = [{
+    functionDeclarations: [
+      {
+        name: "toggleDevice",
+        description: "Turn a device on or off.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            deviceId: { type: Type.STRING, description: "The ID of the device to toggle. Infer from context or ask user." },
+            state: { type: Type.BOOLEAN, description: "True for ON/LOCKED, False for OFF/UNLOCKED." }
+          },
+          required: ["deviceId", "state"]
+        }
+      },
+      {
+        name: "setDeviceValue",
+        description: "Set a value for a device (e.g., brightness, temperature).",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            deviceId: { type: Type.STRING, description: "The ID of the device." },
+            value: { type: Type.NUMBER, description: "The value to set." }
+          },
+          required: ["deviceId", "value"]
+        }
+      },
+      {
+        name: "getHomeStatus",
+        description: "Get the current status of all devices and energy stats.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {},
+        }
+      }
+    ]
+  }];
+
+  // --- Simulation Logic ---
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStats(prev => ({
+        ...prev,
+        currentUsage: Math.max(0, prev.currentUsage + (Math.random() - 0.5) * 0.5),
+        solarGeneration: Math.max(0, prev.solarGeneration + (Math.random() - 0.5) * 0.3),
+        batteryLevel: Math.max(0, Math.min(100, prev.batteryLevel + (prev.solarGeneration > prev.currentUsage ? 0.1 : -0.1))),
+      }));
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // --- AI Logic ---
+  const handleSendMessage = async (text: string) => {
+    if (!aiRef.current) return;
+
+    const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', content: text, timestamp: Date.now() };
+    setMessages(prev => [...prev, userMsg]);
+    setIsTyping(true);
+
+    try {
+      const model = aiRef.current.getGenerativeModel({
+        model: "gemini-2.5-flash",
+        tools: tools,
+        systemInstruction: `You are a sophisticated AI Home Assistant named Jarvis. 
+        You control a smart home with a 'Cyberpunk/Sci-Fi' interface.
+        Always be helpful, concise, and slightly robotic but polite.
+        
+        Current Devices: ${JSON.stringify(devices.map(d => ({ id: d.id, name: d.name, room: d.room })))}
+        
+        If the user asks to change something, use the provided tools.
+        If the user asks about status, use getHomeStatus or infer from your knowledge if recently updated.
+        When you take an action, confirm it briefly.`
+      });
+
+      const chat = model.startChat({
+        history: messages.map(m => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.content }]
+        }))
+      });
+
+      const result = await chat.sendMessage(text);
+      const response = await result.response;
+      const functionCalls = response.functionCalls();
+
+      let finalResponseText = response.text();
+
+      if (functionCalls && functionCalls.length > 0) {
+        const functionResponses = [];
+        
+        for (const call of functionCalls) {
+          const { name, args } = call;
+          let functionResponse = {};
+
+          if (name === "toggleDevice") {
+            const { deviceId, state } = args as any;
+            toggleDevice(deviceId);
+            functionResponse = { status: "success", message: `Device ${deviceId} turned ${state ? 'ON' : 'OFF'}` };
+          } else if (name === "setDeviceValue") {
+            const { deviceId, value } = args as any;
+            setDeviceValue(deviceId, value);
+            functionResponse = { status: "success", message: `Device ${deviceId} set to ${value}` };
+          } else if (name === "getHomeStatus") {
+            functionResponse = { devices, stats };
+          }
+
+          functionResponses.push({
+            functionResponse: {
+              name,
+              response: functionResponse
+            }
+          });
+        }
+
+        // Send function execution results back to the model
+        const finalResult = await chat.sendMessage(functionResponses);
+        finalResponseText = finalResult.response.text();
+      }
+
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: finalResponseText,
+        timestamp: Date.now()
+      }]);
+
+    } catch (error) {
+      console.error("AI Error:", error);
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: "I apologize, but I encountered a system error processing your request.",
+        timestamp: Date.now()
+      }]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-cyber-bg text-gray-200 font-sans selection:bg-cyber-primary/30">
+      {/* Background Grid Effect */}
+      <div className="fixed inset-0 bg-[linear-gradient(to_right,#1f2128_1px,transparent_1px),linear-gradient(to_bottom,#1f2128_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none z-0" />
+      
+      <div className="relative z-10 flex flex-col md:flex-row h-screen overflow-hidden">
+        {/* Sidebar */}
+        <aside className="w-full md:w-20 lg:w-64 bg-cyber-card/80 border-r border-cyber-border flex flex-col backdrop-blur-md">
+          <div className="p-6 flex items-center gap-3 border-b border-cyber-border">
+            <div className="w-10 h-10 bg-cyber-primary text-black rounded-lg flex items-center justify-center font-bold text-xl shadow-[0_0_15px_rgba(0,240,255,0.5)]">
+              AI
+            </div>
+            <span className="hidden lg:block font-mono font-bold text-lg tracking-wider text-white">NEXUS</span>
+          </div>
+          
+          <nav className="flex-1 p-4 space-y-2">
+            <NavItem icon={<Home />} label="Dashboard" active />
+            <NavItem icon={<Activity />} label="Analytics" />
+            <NavItem icon={<Zap />} label="Energy" />
+            <NavItem icon={<Settings />} label="System" />
+          </nav>
+
+          <div className="p-4 border-t border-cyber-border">
+            <div className="hidden lg:flex items-center gap-3 p-3 rounded-lg bg-cyber-bg/50 border border-cyber-border">
+              <div className="w-2 h-2 rounded-full bg-cyber-success animate-pulse" />
+              <div className="text-xs font-mono">
+                <div className="text-gray-400">STATUS</div>
+                <div className="text-cyber-success">ONLINE</div>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 flex flex-col overflow-hidden relative">
+          {/* Header */}
+          <header className="h-16 border-b border-cyber-border bg-cyber-card/50 backdrop-blur flex items-center justify-between px-6">
+            <h1 className="text-xl font-bold tracking-wide text-white flex items-center gap-2">
+              <span className="text-cyber-primary">///</span> MAIN CONTROL
+            </h1>
+            <div className="flex items-center gap-4">
+              <span className="text-xs font-mono text-gray-500">{new Date().toLocaleDateString()}</span>
+              <div className="w-8 h-8 rounded-full bg-cyber-secondary/20 border border-cyber-secondary flex items-center justify-center">
+                <User className="w-4 h-4 text-cyber-secondary" />
+              </div>
+            </div>
+          </header>
+
+          {/* Scrollable Area */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+            
+            {/* Top Row: Energy & Stats */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <EnergyMonitor stats={stats} />
+              </div>
+              <div className="hidden lg:block">
+                {/* Placeholder for mini weather or quick stats */}
+                <div className="h-full glass-panel rounded-xl p-6 flex flex-col justify-between">
+                  <h3 className="text-sm font-mono font-bold uppercase text-cyber-secondary neon-text">Environment</h3>
+                  <div className="text-5xl font-bold text-white">24°C</div>
+                  <div className="text-sm text-gray-400">Humidity: 45%</div>
+                  <div className="text-sm text-gray-400">Air Quality: Excellent</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Device Controls */}
+            <div>
+              <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <span className="w-1 h-6 bg-cyber-primary rounded-full" />
+                DEVICE MATRIX
+              </h2>
+              <DeviceControl 
+                devices={devices} 
+                onToggle={toggleDevice} 
+                onValueChange={setDeviceValue} 
+              />
+            </div>
+          </div>
+        </main>
+
+        {/* Right Panel: Chat */}
+        <aside className="w-full md:w-80 lg:w-96 border-l border-cyber-border bg-cyber-card/30 backdrop-blur-sm absolute md:relative right-0 top-0 bottom-0 z-20 transform transition-transform duration-300 translate-x-full md:translate-x-0">
+           <AIChat 
+             messages={messages} 
+             onSendMessage={handleSendMessage} 
+             isTyping={isTyping} 
+           />
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function NavItem({ icon, label, active }: { icon: React.ReactNode, label: string, active?: boolean }) {
+  return (
+    <button className={cn(
+      "w-full flex items-center gap-3 p-3 rounded-lg transition-all duration-200 group",
+      active 
+        ? "bg-cyber-primary/10 text-cyber-primary border border-cyber-primary/20" 
+        : "text-gray-400 hover:bg-white/5 hover:text-white"
+    )}>
+      <span className={cn("transition-colors", active ? "text-cyber-primary" : "text-gray-500 group-hover:text-white")}>
+        {icon}
+      </span>
+      <span className="hidden lg:block font-medium text-sm">{label}</span>
+      {active && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-cyber-primary shadow-[0_0_5px_rgba(0,240,255,0.8)]" />}
+    </button>
+  );
+}
