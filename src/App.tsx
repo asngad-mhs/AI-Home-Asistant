@@ -45,11 +45,6 @@ export default function App() {
   // Gemini Client
   const aiRef = useRef<GoogleGenAI | null>(null);
 
-  // HARDCODED FALLBACK KEY (Provided by user)
-  // WARNING: In a real production app, never hardcode API keys in client-side code.
-  // Always use environment variables or a backend proxy.
-  const FALLBACK_API_KEY = "AIzaSyBstkmCN6WHprz0KCUvIYw-LW0u6r0ruCg";
-
   // Initialize AI Client
   useEffect(() => {
     const initAI = (key: string) => {
@@ -84,11 +79,13 @@ export default function App() {
       setUserApiKey(storedKey);
       initAI(storedKey);
     } else {
-      // 3. Use Fallback Key
-      console.warn("Using fallback API key");
-      initAI(FALLBACK_API_KEY);
-      // Optional: Auto-save to local storage so it persists in settings UI
-      setUserApiKey(FALLBACK_API_KEY);
+      setIsSystemOnline(false);
+      setMessages(prev => [...prev, {
+        id: 'no-key',
+        role: 'assistant',
+        content: "PERINGATAN: Kunci API tidak ditemukan. Silakan dapatkan Kunci API Gratis di Google AI Studio dan masukkan di menu 'Sistem' (ikon roda gigi).",
+        timestamp: Date.now()
+      }]);
     }
   }, []);
 
@@ -415,6 +412,19 @@ export default function App() {
                         Jika Anda men-deploy aplikasi ini di cloud pribadi, masukkan kunci API Anda di sini. 
                         Kunci akan disimpan di browser Anda.
                       </p>
+                      
+                      <div className="mb-4">
+                        <a 
+                          href="https://aistudio.google.com/app/apikey" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 text-xs text-cyber-primary hover:text-cyber-primary/80 underline underline-offset-4"
+                        >
+                          <Sparkles className="w-3 h-3" />
+                          Dapatkan Kunci API Gratis di Google AI Studio
+                        </a>
+                      </div>
+
                       <div className="flex gap-2">
                         <input 
                           type="password" 
