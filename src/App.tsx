@@ -38,13 +38,36 @@ export default function App() {
     { id: '1', role: 'assistant', content: 'Sistem diinisialisasi. Asisten Rumah AI siap. Ada yang bisa saya bantu untuk mengelola rumah Anda hari ini?', timestamp: Date.now() }
   ]);
   const [isTyping, setIsTyping] = useState(false);
+  const [isSystemOnline, setIsSystemOnline] = useState(false);
 
   // Gemini Client
   const aiRef = useRef<GoogleGenAI | null>(null);
 
   useEffect(() => {
-    if (process.env.GEMINI_API_KEY) {
-      aiRef.current = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const apiKey = process.env.GEMINI_API_KEY;
+    console.log("Checking API Key...", apiKey ? "Present" : "Missing");
+    
+    if (apiKey) {
+      try {
+        aiRef.current = new GoogleGenAI({ apiKey });
+        setIsSystemOnline(true);
+      } catch (e) {
+        console.error("Failed to initialize Gemini client:", e);
+        setMessages(prev => [...prev, {
+          id: 'init-error',
+          role: 'assistant',
+          content: "Sistem Error: Gagal menginisialisasi klien AI. Cek konsol untuk detail.",
+          timestamp: Date.now()
+        }]);
+      }
+    } else {
+      setIsSystemOnline(false);
+      setMessages(prev => [...prev, {
+        id: 'no-key',
+        role: 'assistant',
+        content: "PERINGATAN: Kunci API Gemini tidak ditemukan. Pastikan Anda telah mengonfigurasi Secrets dengan benar di AI Studio.",
+        timestamp: Date.now()
+      }]);
     }
   }, []);
 
@@ -120,10 +143,19 @@ export default function App() {
 
   // --- AI Logic ---
   const handleSendMessage = async (text: string) => {
-    if (!aiRef.current) return;
-
     const userMsg: ChatMessage = { id: Date.now().toString(), role: 'user', content: text, timestamp: Date.now() };
     setMessages(prev => [...prev, userMsg]);
+
+    if (!aiRef.current) {
+      setMessages(prev => [...prev, {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: "Sistem Error: Kunci API tidak terdeteksi atau inisialisasi gagal. Tidak dapat memproses pesan.",
+        timestamp: Date.now()
+      }]);
+      return;
+    }
+
     setIsTyping(true);
 
     try {
@@ -234,10 +266,12 @@ export default function App() {
 
           <div className="p-4 border-t border-cyber-border">
             <div className="hidden lg:flex items-center gap-3 p-3 rounded-lg bg-cyber-bg/50 border border-cyber-border">
-              <div className="w-2 h-2 rounded-full bg-cyber-success animate-pulse" />
+              <div className={cn("w-2 h-2 rounded-full animate-pulse", isSystemOnline ? "bg-cyber-success" : "bg-cyber-danger")} />
               <div className="text-xs font-mono">
                 <div className="text-gray-400">STATUS</div>
-                <div className="text-cyber-success">ONLINE</div>
+                <div className={isSystemOnline ? "text-cyber-success" : "text-cyber-danger"}>
+                  {isSystemOnline ? "ONLINE" : "OFFLINE"}
+                </div>
               </div>
             </div>
           </div>
