@@ -45,6 +45,11 @@ export default function App() {
   // Gemini Client
   const aiRef = useRef<GoogleGenAI | null>(null);
 
+  // HARDCODED FALLBACK KEY (Provided by user)
+  // WARNING: In a real production app, never hardcode API keys in client-side code.
+  // Always use environment variables or a backend proxy.
+  const FALLBACK_API_KEY = "AIzaSyBstkmCN6WHprz0KCUvIYw-LW0u6r0ruCg";
+
   // Initialize AI Client
   useEffect(() => {
     const initAI = (key: string) => {
@@ -79,13 +84,11 @@ export default function App() {
       setUserApiKey(storedKey);
       initAI(storedKey);
     } else {
-      setIsSystemOnline(false);
-      setMessages(prev => [...prev, {
-        id: 'no-key',
-        role: 'assistant',
-        content: "PERINGATAN: Kunci API tidak ditemukan. Silakan masukkan Kunci API Gemini Anda di menu Pengaturan (Settings) untuk mengaktifkan asisten.",
-        timestamp: Date.now()
-      }]);
+      // 3. Use Fallback Key
+      console.warn("Using fallback API key");
+      initAI(FALLBACK_API_KEY);
+      // Optional: Auto-save to local storage so it persists in settings UI
+      setUserApiKey(FALLBACK_API_KEY);
     }
   }, []);
 
