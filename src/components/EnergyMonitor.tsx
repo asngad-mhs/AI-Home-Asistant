@@ -10,13 +10,13 @@ interface EnergyMonitorProps {
 
 export function EnergyMonitor({ stats }: EnergyMonitorProps) {
   return (
-    <Card title="PLT STATUS (Power Plant)" className="h-full">
+    <Card title="STATUS PLT (Pembangkit Listrik)" className="h-full">
       <div className="grid grid-cols-2 gap-4">
         {/* Current Usage */}
         <div className="bg-cyber-card/50 p-4 rounded-lg border border-cyber-border">
           <div className="flex items-center gap-2 mb-2 text-cyber-danger">
             <Zap className="w-4 h-4" />
-            <span className="text-xs font-mono uppercase">Load</span>
+            <span className="text-xs font-mono uppercase">Beban</span>
           </div>
           <div className="text-2xl font-bold font-mono text-white">
             {stats.currentUsage.toFixed(2)} <span className="text-sm text-gray-500">kW</span>
@@ -35,7 +35,7 @@ export function EnergyMonitor({ stats }: EnergyMonitorProps) {
         <div className="bg-cyber-card/50 p-4 rounded-lg border border-cyber-border">
           <div className="flex items-center gap-2 mb-2 text-cyber-warning">
             <Sun className="w-4 h-4" />
-            <span className="text-xs font-mono uppercase">Solar</span>
+            <span className="text-xs font-mono uppercase">Surya</span>
           </div>
           <div className="text-2xl font-bold font-mono text-white">
             {stats.solarGeneration.toFixed(2)} <span className="text-sm text-gray-500">kW</span>
@@ -55,9 +55,9 @@ export function EnergyMonitor({ stats }: EnergyMonitorProps) {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2 text-cyber-success">
               <Battery className="w-4 h-4" />
-              <span className="text-xs font-mono uppercase">Battery Storage</span>
+              <span className="text-xs font-mono uppercase">Penyimpanan Baterai</span>
             </div>
-            <span className="text-xs font-mono text-cyber-success">{stats.batteryLevel}%</span>
+            <span className="text-xs font-mono text-cyber-success">{stats.batteryLevel.toFixed(1)}%</span>
           </div>
           
           <div className="relative h-4 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
@@ -85,12 +85,12 @@ export function EnergyMonitor({ stats }: EnergyMonitorProps) {
         <div className="col-span-2 flex items-center justify-between bg-cyber-card/30 p-3 rounded border border-cyber-border">
            <div className="flex items-center gap-2">
              <Activity className="w-4 h-4 text-cyber-secondary" />
-             <span className="text-xs font-mono uppercase text-gray-400">Grid Status</span>
+             <span className="text-xs font-mono uppercase text-gray-400">Status Jaringan</span>
            </div>
            <div className="flex items-center gap-2">
              <div className={cn("w-2 h-2 rounded-full animate-pulse", stats.gridStatus === 'connected' ? "bg-cyber-success" : "bg-cyber-danger")} />
              <span className={cn("text-xs font-mono font-bold", stats.gridStatus === 'connected' ? "text-cyber-success" : "text-cyber-danger")}>
-               {stats.gridStatus.toUpperCase()}
+               {stats.gridStatus === 'connected' ? 'TERHUBUNG' : 'TERPUTUS'}
              </span>
            </div>
         </div>

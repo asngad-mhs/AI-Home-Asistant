@@ -15,12 +15,12 @@ import { cn } from '@/lib/utils';
 
 // Initial Mock Data
 const INITIAL_DEVICES: Device[] = [
-  { id: 'light-1', name: 'Living Room Light', type: 'light', room: 'Living Room', isOn: true, value: 80 },
-  { id: 'ac-1', name: 'Master AC', type: 'ac', room: 'Bedroom', isOn: true, value: 24 },
-  { id: 'fan-1', name: 'Ceiling Fan', type: 'fan', room: 'Living Room', isOn: false, value: 0 },
-  { id: 'lock-1', name: 'Front Door', type: 'lock', room: 'Entrance', isOn: true }, // isOn = Locked
-  { id: 'light-2', name: 'Kitchen Light', type: 'light', room: 'Kitchen', isOn: false, value: 0 },
-  { id: 'outlet-1', name: 'Coffee Maker', type: 'outlet', room: 'Kitchen', isOn: false },
+  { id: 'light-1', name: 'Lampu Ruang Tamu', type: 'light', room: 'Ruang Tamu', isOn: true, value: 80 },
+  { id: 'ac-1', name: 'AC Utama', type: 'ac', room: 'Kamar Tidur', isOn: true, value: 24 },
+  { id: 'fan-1', name: 'Kipas Angin', type: 'fan', room: 'Ruang Tamu', isOn: false, value: 0 },
+  { id: 'lock-1', name: 'Pintu Depan', type: 'lock', room: 'Pintu Masuk', isOn: true }, // isOn = Terkunci
+  { id: 'light-2', name: 'Lampu Dapur', type: 'light', room: 'Dapur', isOn: false, value: 0 },
+  { id: 'outlet-1', name: 'Mesin Kopi', type: 'outlet', room: 'Dapur', isOn: false },
 ];
 
 const INITIAL_STATS: EnergyStats = {
@@ -35,7 +35,7 @@ export default function App() {
   const [devices, setDevices] = useState<Device[]>(INITIAL_DEVICES);
   const [stats, setStats] = useState<EnergyStats>(INITIAL_STATS);
   const [messages, setMessages] = useState<ChatMessage[]>([
-    { id: '1', role: 'assistant', content: 'System initialized. AI Home Assistant ready. How can I help you manage your home today?', timestamp: Date.now() }
+    { id: '1', role: 'assistant', content: 'Sistem diinisialisasi. Asisten Rumah AI siap. Ada yang bisa saya bantu untuk mengelola rumah Anda hari ini?', timestamp: Date.now() }
   ]);
   const [isTyping, setIsTyping] = useState(false);
 
@@ -72,31 +72,31 @@ export default function App() {
     functionDeclarations: [
       {
         name: "toggleDevice",
-        description: "Turn a device on or off.",
+        description: "Menyalakan atau mematikan perangkat.",
         parameters: {
           type: Type.OBJECT,
           properties: {
-            deviceId: { type: Type.STRING, description: "The ID of the device to toggle. Infer from context or ask user." },
-            state: { type: Type.BOOLEAN, description: "True for ON/LOCKED, False for OFF/UNLOCKED." }
+            deviceId: { type: Type.STRING, description: "ID perangkat yang akan diubah. Simpulkan dari konteks atau tanyakan pengguna." },
+            state: { type: Type.BOOLEAN, description: "True untuk NYALA/TERKUNCI, False untuk MATI/TERBUKA." }
           },
           required: ["deviceId", "state"]
         }
       },
       {
         name: "setDeviceValue",
-        description: "Set a value for a device (e.g., brightness, temperature).",
+        description: "Mengatur nilai untuk perangkat (misalnya, kecerahan, suhu).",
         parameters: {
           type: Type.OBJECT,
           properties: {
-            deviceId: { type: Type.STRING, description: "The ID of the device." },
-            value: { type: Type.NUMBER, description: "The value to set." }
+            deviceId: { type: Type.STRING, description: "ID perangkat." },
+            value: { type: Type.NUMBER, description: "Nilai yang akan diatur." }
           },
           required: ["deviceId", "value"]
         }
       },
       {
         name: "getHomeStatus",
-        description: "Get the current status of all devices and energy stats.",
+        description: "Mendapatkan status terkini dari semua perangkat dan statistik energi.",
         parameters: {
           type: Type.OBJECT,
           properties: {},
@@ -127,32 +127,34 @@ export default function App() {
     setIsTyping(true);
 
     try {
-      const model = aiRef.current.getGenerativeModel({
+      // Create chat instance with latest context
+      const chat = aiRef.current.chats.create({
         model: "gemini-2.5-flash",
-        tools: tools,
-        systemInstruction: `You are a sophisticated AI Home Assistant named Jarvis. 
-        You control a smart home with a 'Cyberpunk/Sci-Fi' interface.
-        Always be helpful, concise, and slightly robotic but polite.
-        
-        Current Devices: ${JSON.stringify(devices.map(d => ({ id: d.id, name: d.name, room: d.room })))}
-        
-        If the user asks to change something, use the provided tools.
-        If the user asks about status, use getHomeStatus or infer from your knowledge if recently updated.
-        When you take an action, confirm it briefly.`
-      });
-
-      const chat = model.startChat({
+        config: {
+          tools: tools,
+          systemInstruction: `Anda adalah Asisten Rumah AI canggih bernama Jarvis. 
+          Anda mengontrol rumah pintar dengan antarmuka 'Cyberpunk/Sci-Fi'.
+          Selalu membantu, ringkas, dan sedikit robotik namun sopan.
+          Gunakan Bahasa Indonesia yang baik dan benar, namun tetap terdengar futuristik.
+          
+          Perangkat Saat Ini: ${JSON.stringify(devices.map(d => ({ id: d.id, name: d.name, room: d.room })))}
+          
+          Jika pengguna meminta untuk mengubah sesuatu, gunakan alat (tools) yang disediakan.
+          Jika pengguna bertanya tentang status, gunakan getHomeStatus atau simpulkan dari pengetahuan Anda jika baru saja diperbarui.
+          Ketika Anda mengambil tindakan, konfirmasikan secara singkat.`
+        },
         history: messages.map(m => ({
           role: m.role === 'assistant' ? 'model' : 'user',
           parts: [{ text: m.content }]
         }))
       });
 
-      const result = await chat.sendMessage(text);
-      const response = await result.response;
-      const functionCalls = response.functionCalls();
-
-      let finalResponseText = response.text();
+      // Send user message
+      const result = await chat.sendMessage({ message: text });
+      
+      // Handle function calls
+      const functionCalls = result.functionCalls;
+      let finalResponseText = result.text;
 
       if (functionCalls && functionCalls.length > 0) {
         const functionResponses = [];
@@ -164,11 +166,11 @@ export default function App() {
           if (name === "toggleDevice") {
             const { deviceId, state } = args as any;
             toggleDevice(deviceId);
-            functionResponse = { status: "success", message: `Device ${deviceId} turned ${state ? 'ON' : 'OFF'}` };
+            functionResponse = { status: "success", message: `Perangkat ${deviceId} diubah menjadi ${state ? 'NYALA' : 'MATI'}` };
           } else if (name === "setDeviceValue") {
             const { deviceId, value } = args as any;
             setDeviceValue(deviceId, value);
-            functionResponse = { status: "success", message: `Device ${deviceId} set to ${value}` };
+            functionResponse = { status: "success", message: `Perangkat ${deviceId} diatur ke ${value}` };
           } else if (name === "getHomeStatus") {
             functionResponse = { devices, stats };
           }
@@ -182,23 +184,25 @@ export default function App() {
         }
 
         // Send function execution results back to the model
-        const finalResult = await chat.sendMessage(functionResponses);
-        finalResponseText = finalResult.response.text();
+        const finalResult = await chat.sendMessage({ message: functionResponses });
+        finalResponseText = finalResult.text;
       }
 
-      setMessages(prev => [...prev, {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: finalResponseText,
-        timestamp: Date.now()
-      }]);
+      if (finalResponseText) {
+        setMessages(prev => [...prev, {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: finalResponseText,
+          timestamp: Date.now()
+        }]);
+      }
 
     } catch (error) {
       console.error("AI Error:", error);
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: "I apologize, but I encountered a system error processing your request.",
+        content: "Maaf, saya mengalami kesalahan sistem saat memproses permintaan Anda. (Error: " + (error instanceof Error ? error.message : String(error)) + ")",
         timestamp: Date.now()
       }]);
     } finally {
@@ -222,10 +226,10 @@ export default function App() {
           </div>
           
           <nav className="flex-1 p-4 space-y-2">
-            <NavItem icon={<Home />} label="Dashboard" active />
-            <NavItem icon={<Activity />} label="Analytics" />
-            <NavItem icon={<Zap />} label="Energy" />
-            <NavItem icon={<Settings />} label="System" />
+            <NavItem icon={<Home />} label="Dasbor" active />
+            <NavItem icon={<Activity />} label="Analitik" />
+            <NavItem icon={<Zap />} label="Energi" />
+            <NavItem icon={<Settings />} label="Sistem" />
           </nav>
 
           <div className="p-4 border-t border-cyber-border">
@@ -244,10 +248,10 @@ export default function App() {
           {/* Header */}
           <header className="h-16 border-b border-cyber-border bg-cyber-card/50 backdrop-blur flex items-center justify-between px-6">
             <h1 className="text-xl font-bold tracking-wide text-white flex items-center gap-2">
-              <span className="text-cyber-primary">///</span> MAIN CONTROL
+              <span className="text-cyber-primary">///</span> KONTROL UTAMA
             </h1>
             <div className="flex items-center gap-4">
-              <span className="text-xs font-mono text-gray-500">{new Date().toLocaleDateString()}</span>
+              <span className="text-xs font-mono text-gray-500">{new Date().toLocaleDateString('id-ID')}</span>
               <div className="w-8 h-8 rounded-full bg-cyber-secondary/20 border border-cyber-secondary flex items-center justify-center">
                 <User className="w-4 h-4 text-cyber-secondary" />
               </div>
@@ -265,10 +269,10 @@ export default function App() {
               <div className="hidden lg:block">
                 {/* Placeholder for mini weather or quick stats */}
                 <div className="h-full glass-panel rounded-xl p-6 flex flex-col justify-between">
-                  <h3 className="text-sm font-mono font-bold uppercase text-cyber-secondary neon-text">Environment</h3>
+                  <h3 className="text-sm font-mono font-bold uppercase text-cyber-secondary neon-text">Lingkungan</h3>
                   <div className="text-5xl font-bold text-white">24°C</div>
-                  <div className="text-sm text-gray-400">Humidity: 45%</div>
-                  <div className="text-sm text-gray-400">Air Quality: Excellent</div>
+                  <div className="text-sm text-gray-400">Kelembaban: 45%</div>
+                  <div className="text-sm text-gray-400">Kualitas Udara: Sangat Baik</div>
                 </div>
               </div>
             </div>
@@ -277,7 +281,7 @@ export default function App() {
             <div>
               <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                 <span className="w-1 h-6 bg-cyber-primary rounded-full" />
-                DEVICE MATRIX
+                MATRIKS PERANGKAT
               </h2>
               <DeviceControl 
                 devices={devices} 

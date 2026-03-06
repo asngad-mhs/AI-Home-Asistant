@@ -65,7 +65,7 @@ function DeviceCard({ device, onToggle, onValueChange }: { device: Device; onTog
         {device.type === 'light' && device.isOn && (
           <div className="mt-4">
             <div className="flex justify-between text-xs text-gray-400 mb-1">
-              <span>Brightness</span>
+              <span>Kecerahan</span>
               <span>{device.value}%</span>
             </div>
             <input 

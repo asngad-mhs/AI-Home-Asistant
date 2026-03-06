@@ -41,8 +41,8 @@ export function AIChat({ messages, onSendMessage, isTyping }: AIChatProps) {
           <span className="absolute -top-1 -right-1 w-3 h-3 bg-cyber-success rounded-full animate-pulse shadow-[0_0_8px_rgba(0,255,157,0.8)]" />
         </div>
         <div>
-          <h3 className="font-bold text-white tracking-wide">AI ASSISTANT</h3>
-          <p className="text-[10px] text-cyber-primary font-mono uppercase tracking-widest">System Online</p>
+          <h3 className="font-bold text-white tracking-wide">ASISTEN AI</h3>
+          <p className="text-[10px] text-cyber-primary font-mono uppercase tracking-widest">Sistem Online</p>
         </div>
       </div>
 
@@ -106,7 +106,7 @@ export function AIChat({ messages, onSendMessage, isTyping }: AIChatProps) {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Command or ask..."
+            placeholder="Perintah atau tanya..."
             className="w-full bg-black/50 border border-cyber-border rounded-lg py-3 pl-4 pr-12 text-sm text-white focus:outline-none focus:border-cyber-primary focus:ring-1 focus:ring-cyber-primary/50 transition-all placeholder:text-gray-600 font-mono"
             disabled={isTyping}
           />
