@@ -272,10 +272,20 @@ export default function App() {
 
     } catch (error) {
       console.error("AI Error:", error);
+      
+      let errorMessage = "Maaf, saya mengalami kesalahan sistem saat memproses permintaan Anda.";
+      const errorStr = JSON.stringify(error) + String(error); // Capture full error details
+
+      if (errorStr.includes("429") || errorStr.includes("RESOURCE_EXHAUSTED")) {
+        errorMessage = "⚠️ KUOTA HABIS: Kunci API yang digunakan telah mencapai batas penggunaan. Silakan ganti dengan Kunci API Gemini Anda sendiri di menu 'Sistem' (ikon roda gigi) untuk melanjutkan.";
+      } else {
+        errorMessage += " (Error: " + (error instanceof Error ? error.message : String(error)) + ")";
+      }
+
       setMessages(prev => [...prev, {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: "Maaf, saya mengalami kesalahan sistem saat memproses permintaan Anda. (Error: " + (error instanceof Error ? error.message : String(error)) + ")",
+        content: errorMessage,
         timestamp: Date.now()
       }]);
     } finally {
