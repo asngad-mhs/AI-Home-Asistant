@@ -315,7 +315,14 @@ export default function App() {
             <NavItem icon={<Activity />} label="Analitik" />
             <NavItem icon={<Zap />} label="Energi" />
             <NavItem 
-              icon={<Settings />} 
+              icon={
+                <div className="relative">
+                  <Settings />
+                  {!isSystemOnline && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 bg-cyber-danger rounded-full animate-ping" />
+                  )}
+                </div>
+              } 
               label="Sistem" 
               active={currentView === 'settings'}
               onClick={() => setCurrentView('settings')}
